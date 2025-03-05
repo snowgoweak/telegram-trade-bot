@@ -14,7 +14,7 @@ app.include_router(order_router, prefix="/api", tags=["Order"])
 
 @app.on_event("startup")
 async def startup_event():
-    scheduler = await start_scheduler()
+    await start_scheduler()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

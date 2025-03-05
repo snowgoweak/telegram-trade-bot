@@ -1,73 +1,34 @@
 import datetime
 import uuid
-from enum import Enum
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from service.app.database import get_db
 from service.app.models import Order, User, Wallet
+from service.app.schemas import OrderCreate, OrderResponse, OrderStatus, OrderUpdate
 
 router = APIRouter()
-
-
-class OrderType(str, Enum):
-    TON_TO_JETTON: str = "TON_TO_JETTON"
-    JETTON_TO_TON: str = "JETTON_TO_TON"
-
-
-class OrderCreate(BaseModel):
-    order_type: OrderType
-    price: float
-    volume: float
-    jetton_address: Optional[str] = None
-
-
-class OrderUpdate(BaseModel):
-    price: Optional[float] = None
-    volume: Optional[float] = None
-    jetton_address: Optional[str] = None
-
-
-class OrderResponse(BaseModel):
-    order_id: str
-    order_type: str
-    price: float
-    volume: float
-    timestamp: datetime.datetime
-    status: str
-    tx_hash: Optional[str] = None
-    wallet_id: int
-    jetton_address: Optional[str] = None
-
-    class Config:
-        orm_mode = True
 
 
 @router.post("/orders/{telegram_user_id}", response_model=OrderResponse)
 async def create_order(
     telegram_user_id: str, order_data: OrderCreate, db: AsyncSession = Depends(get_db)
 ):
-    """
-    Создание ордера:
-    1. Находим пользователя по telegram_user_id.
-    2. Получаем кошелек пользователя.
-    3. Создаем ордер, привязываем его к кошельку.
-    """
+
     result = await db.execute(
         select(User).where(User.telegram_user_id == telegram_user_id)
     )
     user = result.scalars().first()
     if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise HTTPException(status_code=404, detail="The user was not found")
 
     wallet_result = await db.execute(select(Wallet).where(Wallet.user_id == user.id))
     wallet = wallet_result.scalars().first()
     if not wallet:
-        raise HTTPException(status_code=404, detail="Кошелек не найден")
+        raise HTTPException(status_code=404, detail="Wallet not found")
 
     new_order = Order(
         order_id=str(uuid.uuid4()),
@@ -76,7 +37,7 @@ async def create_order(
         volume=order_data.volume,
         jetton_address=order_data.jetton_address,
         wallet_id=wallet.id,
-        status="created",
+        status=OrderStatus.CREATED.value,
         timestamp=datetime.datetime.utcnow(),
     )
     db.add(new_order)
@@ -87,20 +48,17 @@ async def create_order(
 
 @router.get("/orders/{telegram_user_id}", response_model=List[OrderResponse])
 async def get_orders(telegram_user_id: str, db: AsyncSession = Depends(get_db)):
-    """
-    Получение списка ордеров для пользователя.
-    """
     result = await db.execute(
         select(User).where(User.telegram_user_id == telegram_user_id)
     )
     user = result.scalars().first()
     if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise HTTPException(status_code=404, detail="The user was not found")
 
     wallet_result = await db.execute(select(Wallet).where(Wallet.user_id == user.id))
     wallet = wallet_result.scalars().first()
     if not wallet:
-        raise HTTPException(status_code=404, detail="Кошелек не найден")
+        raise HTTPException(status_code=404, detail="Wallet not found")
 
     orders_result = await db.execute(select(Order).where(Order.wallet_id == wallet.id))
     orders = orders_result.scalars().all()
@@ -111,27 +69,24 @@ async def get_orders(telegram_user_id: str, db: AsyncSession = Depends(get_db)):
 async def get_order(
     telegram_user_id: str, order_id: str, db: AsyncSession = Depends(get_db)
 ):
-    """
-    Получение информации об ордере по order_id для пользователя.
-    """
     result = await db.execute(
         select(User).where(User.telegram_user_id == telegram_user_id)
     )
     user = result.scalars().first()
     if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise HTTPException(status_code=404, detail="The user was not found")
 
     wallet_result = await db.execute(select(Wallet).where(Wallet.user_id == user.id))
     wallet = wallet_result.scalars().first()
     if not wallet:
-        raise HTTPException(status_code=404, detail="Кошелек не найден")
+        raise HTTPException(status_code=404, detail="Wallet not found")
 
     order_result = await db.execute(
         select(Order).where(Order.order_id == order_id, Order.wallet_id == wallet.id)
     )
     order = order_result.scalars().first()
     if not order:
-        raise HTTPException(status_code=404, detail="Ордер не найден")
+        raise HTTPException(status_code=404, detail="The order was not found")
     return order
 
 
@@ -139,34 +94,30 @@ async def get_order(
 async def delete_order(
     telegram_user_id: str, order_id: str, db: AsyncSession = Depends(get_db)
 ):
-    """
-    Удаление ордера:
-    Если ордер находится в состоянии "pending", удаляем его (либо можно пометить как cancelled).
-    """
     result = await db.execute(
         select(User).where(User.telegram_user_id == telegram_user_id)
     )
     user = result.scalars().first()
     if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise HTTPException(status_code=404, detail="The user was not found")
 
     wallet_result = await db.execute(select(Wallet).where(Wallet.user_id == user.id))
     wallet = wallet_result.scalars().first()
     if not wallet:
-        raise HTTPException(status_code=404, detail="Кошелек не найден")
+        raise HTTPException(status_code=404, detail="Wallet not found")
 
     order_result = await db.execute(
         select(Order).where(Order.order_id == order_id, Order.wallet_id == wallet.id)
     )
     order = order_result.scalars().first()
     if not order:
-        raise HTTPException(status_code=404, detail="Ордер не найден")
+        raise HTTPException(status_code=404, detail="The order was not found")
 
-    if order.status != "created":
-        raise HTTPException(status_code=400, detail="Ордер нельзя удалить")
+    if order.status != OrderStatus.CREATED.value:
+        raise HTTPException(status_code=400, detail="The order cannot be deleted")
     await db.delete(order)
     await db.commit()
-    return {"detail": "Ордер удалён"}
+    return {"detail": "The order has been deleted"}
 
 
 @router.put("/orders/{telegram_user_id}/{order_id}")
@@ -176,36 +127,29 @@ async def update_order(
     order_update: OrderUpdate,
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Ручка для редактирования ордера.
-    1. Находим пользователя и его кошелек.
-    2. Ищем ордер по order_id, связанный с кошельком.
-    3. Если ордер находится в состоянии "pending", обновляем указанные поля.
-    4. Если ордер не pending, редактирование запрещено.
-    """
     result = await db.execute(
         select(User).where(User.telegram_user_id == telegram_user_id)
     )
     user = result.scalars().first()
     if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise HTTPException(status_code=404, detail="The user was not found")
 
     wallet_result = await db.execute(select(Wallet).where(Wallet.user_id == user.id))
     wallet = wallet_result.scalars().first()
     if not wallet:
-        raise HTTPException(status_code=404, detail="Кошелек не найден")
+        raise HTTPException(status_code=404, detail="Wallet not found")
 
     order_result = await db.execute(
         select(Order).where(Order.order_id == order_id, Order.wallet_id == wallet.id)
     )
     order = order_result.scalars().first()
     if not order:
-        raise HTTPException(status_code=404, detail="Ордер не найден")
+        raise HTTPException(status_code=404, detail="The order was not found")
 
-    if order.status != "created":
+    if order.status != OrderStatus.CREATED.value:
         raise HTTPException(
             status_code=400,
-            detail="Редактирование ордера невозможно, статус ордера не 'created'",
+            detail="Order editing is not possible, the order status is not 'created'",
         )
 
     if order_update.price is not None:
@@ -217,4 +161,4 @@ async def update_order(
 
     await db.commit()
     await db.refresh(order)
-    return {"detail": "Ордер обновлён", "order": order}
+    return {"detail": "The order has been updated", "order": order}

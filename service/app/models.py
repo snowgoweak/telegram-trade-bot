@@ -1,9 +1,11 @@
 import datetime
 import uuid
 
-from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+
+from service.app.schemas import OrderStatus
 
 Base = declarative_base()
 
@@ -42,9 +44,7 @@ class Order(Base):
     price = Column(Float, nullable=False)
     volume = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
-    status = Column(
-        String, default="pending"
-    )  #TODO Добавить enum pending, executed, cancelled, error и т.п.
+    status = Column(String, default=OrderStatus.CREATED.value)
     tx_hash = Column(String, nullable=True)
     jetton_address = Column(String, nullable=True)
     wallet_id = Column(Integer, ForeignKey("wallets.id"), nullable=False)
