@@ -20,7 +20,7 @@ def main():
     register_wallet_handlers(app)
     register_orders_handlers(app)
 
-    logger.info("Бот запускается...")
+    logger.info("The bot is starting...")
     app.run_polling()
 
 

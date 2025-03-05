@@ -8,12 +8,12 @@ from bot.keyboards import get_main_menu_keyboard, get_wallet_info_keyboard
 
 async def wallet_menu_handler(update: Update, context: CallbackContext) -> None:
     """
-    При нажатии на кнопку «Кошелек» отображаем подробную информацию:
-    - Адрес
-    - Баланс
-    - Общее количество токенов
-    - Предупреждение о приватном ключе
-    + Кнопки
+    When the "Wallet" button is pressed, display detailed wallet information:
+    - Address
+    - Balance
+    - Total tokens
+    - Warning about the private key
+    + Buttons
     """
     query = update.callback_query
     await query.answer()
@@ -32,12 +32,12 @@ async def wallet_menu_handler(update: Update, context: CallbackContext) -> None:
         tokens_count = wallet_data.get("tokens_count", "0 TON")
 
         text = (
-            f"<b>Кошелек:</b> {address}\n"
-            f"(нажмите, чтобы скопировать)\n\n"
-            f"Баланс: {balance}\n"
-            f"Общее количество токенов: {tokens_count}\n\n"
-            "Если вы экспортируете свой приватный ключ, убедитесь в его сохранности, "
-            "иначе ваш аккаунт может быть украден либо скомпрометирован\n"
+            f"<b>Wallet:</b> <code>{address}</code>\n"
+            f"(click to copy)\n\n"
+            f"Balance: {balance}\n"
+            f"Total tokens: {tokens_count}\n\n"
+            "If you export your private key, make sure to keep it safe, "
+            "otherwise your account may be stolen or compromised\n"
         )
 
         await query.edit_message_text(
@@ -45,7 +45,7 @@ async def wallet_menu_handler(update: Update, context: CallbackContext) -> None:
         )
     except Exception as e:
         await query.edit_message_text(
-            text=f"Ошибка при получении данных кошелька: {str(e)}",
+            text=f"Error retrieving wallet data: {str(e)}",
             reply_markup=get_main_menu_keyboard(),
         )
 
@@ -54,7 +54,7 @@ async def wallet_import_handler(update: Update, context: CallbackContext) -> Non
     query = update.callback_query
     await query.answer()
     await query.edit_message_text(
-        text="Здесь можно импортировать кошелек (placeholder).",
+        text="Here you can import your wallet (placeholder).",
         reply_markup=get_wallet_info_keyboard(),
     )
 
@@ -71,14 +71,13 @@ async def wallet_export_handler(update: Update, context: CallbackContext) -> Non
             response.raise_for_status()
             export_data = response.json()
         text = (
-            f"Экспорт:\n"
-            f"Адрес: {export_data.get('address')}\n"
-            f"Приватный ключ: {export_data.get('mnemonic')}\n"
-            "Будьте осторожны, никому не передавайте свой ключ!"
+            f"Address: <code>{export_data.get('address')}</code>\n"
+            f"Private key: <code>{export_data.get('mnemonic')}</code>\n"
+            "Be careful, do not share your key with anyone!"
         )
-        await query.edit_message_text(text=text)
+        await query.edit_message_text(text=text, parse_mode="HTML")
     except Exception as e:
-        await query.edit_message_text(f"Ошибка при экспорте приватного ключа: {str(e)}")
+        await query.edit_message_text(f"Error exporting private key: {str(e)}")
 
 
 def register_wallet_handlers(app):

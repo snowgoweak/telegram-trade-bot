@@ -6,9 +6,9 @@ from bot.keyboards import get_main_menu_keyboard
 
 async def cmd_start(update: Update, _: CallbackContext) -> None:
     await update.message.reply_text(
-            "Welcome! This is your custom trading bot.\n"
-    "Blockchain integration will be added later.\n"
-    "Please choose an action:",
+        "Welcome! This is your custom trading bot.\n"
+        "Blockchain integration will be added later.\n"
+        "Please choose an action:",
         reply_markup=get_main_menu_keyboard(),
     )
 

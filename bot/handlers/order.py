@@ -27,15 +27,15 @@ from bot.keyboards import (
     get_orders_menu_keyboard,
 )
 
-# Состояния диалога для создания ордера
+# Conversation states for order creation
 ORDER_TYPE, PRICE, VOLUME, JETTON_ADDRESS = range(4)
 
 
 def get_order_type_keyboard() -> InlineKeyboardMarkup:
     """
-    Клавиатура для выбора типа ордера:
-    - Buy (отображается как BUY)
-    - Sell (отображается как SELL)
+    Keyboard for selecting the order type:
+    - Buy (displayed as BUY)
+    - Sell (displayed as SELL)
     """
     keyboard = [
         [
@@ -46,28 +46,28 @@ def get_order_type_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-# ---------------- Обработчики для Telegram ----------------
+# ---------------- Telegram Handlers ----------------
+
+
+STATUS_EMOJIS = {
+    "CREATED": "🆕",
+    "PENDING": "⏳",
+    "EXECUTED": "✅",
+    "FAILED": "❌",
+    "ERROR": "🚫",
+}
 
 
 async def orders_menu_handler(update: Update, context: CallbackContext) -> None:
     """
-    Обработчик для отображения списка ордеров с пагинацией.
-    Показывается максимум 5 ордеров за раз.
-    Если ордеров больше 5, добавляются кнопки пагинации:
-      - «◀ Назад» для перехода на предыдущую страницу (если есть)
-      - «Вперед ▶» для перехода на следующую страницу (если есть)
-    В нижней части добавлены кнопки "Создать ордер" и "Назад" (в главное меню).
-    Callback_data для пагинации: "menu_orders_<page>", где page - номер страницы (начиная с 0).
-    Если data равна ровно "menu_orders", считается, что страница 0.
+    Handler to display the list of orders with pagination and status emojis.
     """
     query = update.callback_query
     await query.answer()
 
-    # Определяем номер страницы из callback_data
     data = query.data
     page = 0
     if data != "menu_orders":
-        # Ожидается формат "menu_orders_<page>"
         try:
             page = int(data.split("_")[-1])
         except Exception:
@@ -89,23 +89,20 @@ async def orders_menu_handler(update: Update, context: CallbackContext) -> None:
         page_orders = orders_data[start:end]
 
         if total_orders == 0:
-            text = "У вас пока нет ордеров."
+            text = "You currently have no orders."
             keyboard = [
-                [
-                    InlineKeyboardButton(
-                        text="Создать ордер", callback_data="order_create"
-                    )
-                ],
-                [InlineKeyboardButton(text="Назад", callback_data="menu_back")],
+                [InlineKeyboardButton("Create order", callback_data="order_create")],
+                [InlineKeyboardButton("Back", callback_data="menu_back")],
             ]
         else:
-            text = f"<b>Ваши ордера (страница {page + 1}):</b>\n"
+            text = f"<b>Your orders (page {page + 1}):</b>\n"
             keyboard = []
-            # Для каждого ордера на текущей странице создаем кнопку
+
+            # Build buttons for orders on the current page
             for order in page_orders:
-                button_text = (
-                    f"Тип: {order.get('order_type')}, " f"Цена: {order.get('price')}"
-                )
+                status = order.get("status", "CREATED")
+                emoji = STATUS_EMOJIS.get(status, "")
+                button_text = f"{emoji} Type: {order.get('order_type')}, Price: {order.get('price')}"
                 keyboard.append(
                     [
                         InlineKeyboardButton(
@@ -115,64 +112,61 @@ async def orders_menu_handler(update: Update, context: CallbackContext) -> None:
                     ]
                 )
 
-            # Добавляем ряд с кнопками пагинации (если необходимо)
+            # Pagination buttons
             pagination_buttons = []
             if page > 0:
                 pagination_buttons.append(
                     InlineKeyboardButton(
-                        text="◀ Назад", callback_data=f"menu_orders_{page - 1}"
+                        "◀ Back", callback_data=f"menu_orders_{page - 1}"
                     )
                 )
             if end < total_orders:
                 pagination_buttons.append(
                     InlineKeyboardButton(
-                        text="Вперед ▶", callback_data=f"menu_orders_{page + 1}"
+                        "Forward ▶", callback_data=f"menu_orders_{page + 1}"
                     )
                 )
             if pagination_buttons:
-                keyboard.insert(
-                    0, pagination_buttons
-                )  # вставляем в начало списка кнопок
+                keyboard.insert(0, pagination_buttons)
 
-            # Добавляем ряд с кнопками для создания ордера и возврата в главное меню
+            # "Create order" and "Back" buttons
             keyboard.append(
                 [
-                    InlineKeyboardButton(
-                        text="Создать ордер", callback_data="order_create"
-                    ),
-                    InlineKeyboardButton(text="Назад", callback_data="menu_back"),
+                    InlineKeyboardButton("Create order", callback_data="order_create"),
+                    InlineKeyboardButton("Back", callback_data="menu_back"),
                 ]
             )
+
         markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(text=text, reply_markup=markup, parse_mode="HTML")
     except Exception as e:
         await query.edit_message_text(
-            text=f"Ошибка при получении ордеров: {str(e)}",
+            text=f"Error retrieving orders: {str(e)}",
             reply_markup=get_main_menu_keyboard(),
         )
 
 
-# --- ConversationHandler для создания ордера ---
+# --- ConversationHandler for order creation ---
 
 
 async def order_start(update: Update, _: CallbackContext) -> int:
     """
-    Точка входа в создание ордера.
-    Вызывается при нажатии на кнопку "Создать ордер" (callback_data="order_create").
-    Отправляем сообщение с клавиатурой для выбора типа ордера.
+    Entry point for creating an order.
+    Called when the "Create order" button (callback_data="order_create") is pressed.
+    Sends a message with the keyboard to select the order type.
     """
     query = update.callback_query
     await query.answer()
     await query.message.edit_text(
-        "Выберите тип ордера:", reply_markup=get_order_type_keyboard()
+        "Select the order type:", reply_markup=get_order_type_keyboard()
     )
     return ORDER_TYPE
 
 
 async def order_type_callback(update: Update, context: CallbackContext) -> int:
     """
-    Обработка выбора типа ордера через inline-кнопки.
-    Если пользователь выбрал «Buy», то order_type = BUY, иначе SELL.
+    Handles the selection of the order type via inline buttons.
+    If the user selects "Buy", order_type is set to BUY, otherwise to SELL.
     """
     query = update.callback_query
     await query.answer()
@@ -183,11 +177,11 @@ async def order_type_callback(update: Update, context: CallbackContext) -> int:
         context.user_data["order_type"] = "SELL"
     else:
         await query.message.edit_text(
-            "Некорректный выбор. Повторите, пожалуйста.",
+            "Invalid selection. Please try again.",
             reply_markup=get_order_type_keyboard(),
         )
         return ORDER_TYPE
-    await query.message.edit_text("Введите цену ордера (число):")
+    await query.message.edit_text("Enter the order price in TON (number):")
     return PRICE
 
 
@@ -196,11 +190,11 @@ async def order_price_handler(update: Update, context: CallbackContext) -> int:
         price = float(update.message.text.strip())
     except ValueError:
         await update.message.reply_text(
-            "Цена должна быть числом. Введите цену еще раз:"
+            "The price must be a number. Please enter the price again:"
         )
         return PRICE
     context.user_data["price"] = price
-    await update.message.reply_text("Введите объем ордера (число):")
+    await update.message.reply_text("Enter the order volume (number):")
     return VOLUME
 
 
@@ -209,11 +203,11 @@ async def order_volume_handler(update: Update, context: CallbackContext) -> int:
         volume = float(update.message.text.strip())
     except ValueError:
         await update.message.reply_text(
-            "Объем должен быть числом. Введите объем еще раз:"
+            "The volume must be a number. Please enter the volume again:"
         )
         return VOLUME
     context.user_data["volume"] = volume
-    await update.message.reply_text("Введите адрес jetton:")
+    await update.message.reply_text("Enter the jetton address:")
     return JETTON_ADDRESS
 
 
@@ -236,14 +230,14 @@ async def order_jetton_handler(update: Update, context: CallbackContext) -> int:
             response.raise_for_status()
             created_order = response.json()
         text = (
-            f"Ордер создан успешно!\n"
+            f"Order created successfully!\n"
             f"ID: {created_order.get('order_id')}\n"
-            f"Тип: {created_order.get('order_type')}\n"
-            f"Цена: {created_order.get('price')}\n"
-            f"Объем: {created_order.get('volume')}"
+            f"Type: {created_order.get('order_type')}\n"
+            f"Price: {created_order.get('price')}\n"
+            f"Volume: {created_order.get('volume')}"
         )
     except Exception as e:
-        text = f"Ошибка создания ордера: {str(e)}"
+        text = f"Error creating order: {str(e)}"
 
     await update.message.reply_text(text, reply_markup=get_orders_menu_keyboard())
     return ConversationHandler.END
@@ -251,23 +245,21 @@ async def order_jetton_handler(update: Update, context: CallbackContext) -> int:
 
 async def order_cancel(update: Update, _: CallbackContext) -> int:
     """
-    Обработчик отмены создания ордера.
+    Handler for order creation cancellation.
     """
     await update.message.reply_text(
-        "Создание ордера отменено.", reply_markup=get_orders_menu_keyboard()
+        "Order creation cancelled.", reply_markup=get_orders_menu_keyboard()
     )
     return ConversationHandler.END
 
 
-# --- Обработчики для деталей, удаления и обновления ордера ---
+# --- Handlers for order details, deletion, and update ---
 
 
-async def order_detail_handler(update: Update, _: CallbackContext) -> None:
+async def order_detail_handler(update: Update, context: CallbackContext) -> None:
     """
-    Обработчик для отображения деталей ордера.
-    В сообщении теперь отображается информация об адресе jettona,
-    а также прикрепляется клавиатура для редактирования и удаления.
-    Ожидается, что callback_data будет содержать идентификатор ордера в формате "order_detail_<order_id>".
+    Handler to display detailed information about an order.
+    Expects callback_data in the format "order_detail_<order_id>".
     """
     query = update.callback_query
     await query.answer()
@@ -281,32 +273,36 @@ async def order_detail_handler(update: Update, _: CallbackContext) -> None:
             )
             response.raise_for_status()
             order_data = response.json()
+
+        # Extract the status from the order data
+        status = order_data.get("status", "CREATED")
+
         text = (
-            f"<b>Ордер:</b>\n"
+            f"<b>Order:</b>\n"
             f"<b>ID:</b> {order_data.get('order_id')}\n"
-            f"<b>Тип:</b> {order_data.get('order_type')}\n"
-            f"<b>Цена:</b> {order_data.get('price')}\n"
-            f"<b>Объем:</b> {order_data.get('volume')}\n"
-            f"<b>Статус:</b> {order_data.get('status')}\n"
-            f"<b>Адрес jettona:</b> {order_data.get('jetton_address')}\n"
-            f"<b>Время:</b> {order_data.get('timestamp')}\n"
+            f"<b>Type:</b> {order_data.get('order_type')}\n"
+            f"<b>Price:</b> {order_data.get('price')}\n"
+            f"<b>Volume:</b> {order_data.get('volume')}\n"
+            f"<b>Status:</b> {status}\n"
+            f"<b>Jetton address:</b> {order_data.get('jetton_address')}\n"
+            f"<b>Timestamp:</b> {order_data.get('timestamp')}\n"
         )
         await query.edit_message_text(
             text=text,
-            reply_markup=get_order_detail_keyboard(order_id),
+            reply_markup=get_order_detail_keyboard(order_id, status),
             parse_mode="HTML",
         )
     except Exception as e:
         await query.edit_message_text(
-            text=f"Ошибка при получении информации ордера: {str(e)}",
+            text=f"Error retrieving order details: {str(e)}",
             reply_markup=get_orders_menu_keyboard(),
         )
 
 
 async def order_delete_handler(update: Update, context: CallbackContext) -> None:
     """
-    Обработчик для удаления ордера.
-    Ожидается, что callback_data имеет формат "order_delete_<order_id>".
+    Handler to delete an order.
+    Expects the callback_data to be in the format "order_delete_<order_id>".
     """
     query = update.callback_query
     await query.answer()
@@ -320,31 +316,31 @@ async def order_delete_handler(update: Update, context: CallbackContext) -> None
             )
             response.raise_for_status()
         await query.edit_message_text(
-            text="Ордер успешно удалён.",
+            text="Order deleted successfully.",
             reply_markup=get_orders_menu_keyboard(),
         )
     except Exception as e:
         await query.edit_message_text(
-            text=f"Ошибка при удалении ордера: {str(e)}",
+            text=f"Error deleting order: {str(e)}",
             reply_markup=get_order_detail_keyboard(order_id),
         )
 
 
-# ---------------- Регистрация обработчиков ----------------
+# ---------------- Registration of Handlers ----------------
 
 
 def register_orders_handlers(app):
     """
-    Регистрируем обработчики для работы с ордерами:
-    - Просмотр списка ордеров
-    - Создание ордера (через ConversationHandler для создания)
-    - Просмотр деталей ордера
-    - Удаление ордера
-    - Обновление ордера (через ConversationHandler)
+    Register handlers for order-related actions:
+    - Viewing the list of orders
+    - Creating an order (via a ConversationHandler for creation)
+    - Viewing order details
+    - Deleting an order
+    - Updating an order (via a ConversationHandler)
     """
     app.add_handler(CallbackQueryHandler(orders_menu_handler, pattern="^menu_orders"))
 
-    # ConversationHandler для создания ордера (предполагается, что он уже зарегистрирован)
+    # ConversationHandler for creating an order (assumed to be already registered)
     conv_create_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(order_start, pattern="^order_create$")],
         states={
@@ -364,8 +360,8 @@ def register_orders_handlers(app):
         CallbackQueryHandler(order_delete_handler, pattern="^order_delete_")
     )
 
-    # Новый ConversationHandler для обновления ордера.
-    # Для каждого шага разрешаем ввод /skip (используем Regex, чтобы захватывать и /skip, и любой другой текст).
+    # New ConversationHandler for updating an order.
+    # For each step, /skip input is allowed (using Regex to capture both /skip and any other text).
     conv_update_handler = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(update_order_start, pattern="^order_update_")

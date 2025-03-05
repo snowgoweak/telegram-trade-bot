@@ -11,56 +11,61 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
 
 def get_wallet_info_keyboard() -> InlineKeyboardMarkup:
     """
-    Клавиатура с кнопками:
-    - Импортировать кошелек
-    - Экспортировать приватный ключ
-    - Вывести TON
-    - Назад
+    Keyboard with buttons:
+    - Import Wallet
+    - Export Private Key
+    - Withdraw TON
+    - Back
     """
     keyboard = [
         [
+            InlineKeyboardButton(text="Import Wallet", callback_data="wallet_import"),
             InlineKeyboardButton(
-                text="Импортировать кошелек", callback_data="wallet_import"
-            ),
-            InlineKeyboardButton(
-                text="Экспортировать приватный ключ", callback_data="wallet_export"
+                text="Export Private Key", callback_data="wallet_export"
             ),
         ],
-        [InlineKeyboardButton(text="Вывести TON", callback_data="wallet_withdraw")],
-        [InlineKeyboardButton(text="Назад", callback_data="menu_back")],
+        [InlineKeyboardButton(text="Withdraw TON", callback_data="wallet_withdraw")],
+        [InlineKeyboardButton(text="Back", callback_data="menu_back")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
 
 def get_orders_menu_keyboard() -> InlineKeyboardMarkup:
     """
-    Клавиатура для меню ордеров:
-    - Создать ордер
-    - Назад (в главное меню или предыдущее меню)
+    Keyboard for the orders menu:
+    - Create Order
+    - Back (to main menu or previous menu)
     """
     keyboard = [
-        [InlineKeyboardButton(text="Создать ордер", callback_data="order_create")],
-        [InlineKeyboardButton(text="Назад", callback_data="menu_back")],
+        [InlineKeyboardButton(text="Create Order", callback_data="order_create")],
+        [InlineKeyboardButton(text="Back", callback_data="menu_back")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_order_detail_keyboard(order_id: str) -> InlineKeyboardMarkup:
+def get_order_detail_keyboard(order_id: str, status: str) -> InlineKeyboardMarkup:
     """
-    Клавиатура для подробной информации об ордере:
-    - Кнопка "Редактировать ордер"
-    - Кнопка "Удалить ордер"
-    - Кнопка "Назад" (в список ордеров)
+    Keyboard for detailed information about an order:
+    - "Edit Order" button (only if status == CREATED)
+    - "Delete Order" button
+    - "Back" button (to the list of orders)
     """
+    # First row of buttons
+    buttons = []
+    if status == "CREATED":
+        buttons.append(
+            InlineKeyboardButton(
+                text="Edit Order", callback_data=f"order_update_{order_id}"
+            )
+        )
+    buttons.append(
+        InlineKeyboardButton(
+            text="Delete Order", callback_data=f"order_delete_{order_id}"
+        )
+    )
+
     keyboard = [
-        [
-            InlineKeyboardButton(
-                text="Редактировать ордер", callback_data=f"order_update_{order_id}"
-            ),
-            InlineKeyboardButton(
-                text="Удалить ордер", callback_data=f"order_delete_{order_id}"
-            ),
-        ],
-        [InlineKeyboardButton(text="Назад", callback_data="menu_orders")],
+        buttons,
+        [InlineKeyboardButton(text="Back", callback_data="menu_orders")],
     ]
     return InlineKeyboardMarkup(keyboard)
