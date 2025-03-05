@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Telegram Bot + FastAPI service in one repo"
 authors = ["Fedor Balabanov <fedor_balabanov13@gmail.com>"]
 readme = "README.md"
-homepage = "https://example.com"
 license = "MIT"
 
 [tool.poetry.dependencies]
@@ -32,8 +31,6 @@ apscheduler = "^3.11.0"
 black = "^25.1.0"
 isort = "^6.0.0"
 
-[tool.poetry.scripts]
-start-service = "telegram-trade-bot.service.main:app"
 
 [tool.isort]
 profile = "black"
@@ -41,6 +38,3 @@ profile = "black"
 [build-system]
 requires = ["poetry-core>=1.3.0"]
 build-backend = "poetry.core.masonry.api"
-
-#[tool.poetry.scripts]
-#start-service = "uvicorn service.main:app --host 0.0.0.0 --port 8001 --reload"
